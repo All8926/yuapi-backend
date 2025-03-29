@@ -4,11 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.apiclientsdk.client.ApiClient;
 import com.example.apiclientsdk.model.UserName;
+import com.google.gson.Gson;
 import com.yupi.project.annotation.AuthCheck;
 import com.yupi.project.common.*;
 import com.yupi.project.constant.CommonConstant;
 import com.yupi.project.exception.BusinessException;
 import com.yupi.project.model.dto.interfaceInfo.InterfaceInfoAddRequest;
+import com.yupi.project.model.dto.interfaceInfo.InterfaceInfoInvokeRequest;
 import com.yupi.project.model.dto.interfaceInfo.InterfaceInfoQueryRequest;
 import com.yupi.project.model.dto.interfaceInfo.InterfaceInfoUpdateRequest;
 import com.yupi.project.model.entity.InterfaceInfo;
@@ -260,6 +262,47 @@ public class InterfaceInfoController {
         newInterfaceInfo.setId(id);
         newInterfaceInfo.setStatus(InterfaceInfoStatusEnum.MALE.getValue());
         boolean result = interfaceInfoService.updateById(newInterfaceInfo);
+        return ResultUtils.success(result);
+    }
+
+
+    /**
+     * 测试接口
+     *
+     * @param invokeRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/invoke")
+    public BaseResponse<Object> InvokeInterfaceInfo(@RequestBody InterfaceInfoInvokeRequest invokeRequest, HttpServletRequest request) {
+        if (invokeRequest == null || invokeRequest.getId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        long id = invokeRequest.getId();
+
+        // 1.接口是否存在
+        InterfaceInfo interfaceInfo = interfaceInfoService.getById(id);
+        if (interfaceInfo == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+        }
+
+        // 2.接口状态是否开启
+        if (interfaceInfo.getStatus() != InterfaceInfoStatusEnum.FEMALE.getValue()) {
+            throw new BusinessException(ErrorCode.FORBIDDEN_ERROR,"接口未开启");
+        }
+
+        User loginUser = userService.getLoginUser(request);
+
+        String accessKey = loginUser.getAccessKey();
+        String secretKey = loginUser.getSecretKey();
+
+        ApiClient apiClient = new ApiClient(accessKey, secretKey);
+
+        Gson gson = new Gson();
+        UserName userName = gson.fromJson(invokeRequest.getRequestParams(), UserName.class);
+
+        String result = apiClient.getUserNameByPost(userName);
+
         return ResultUtils.success(result);
     }
 
